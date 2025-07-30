@@ -52,7 +52,7 @@ class CreditQuickViewModel @Inject constructor(
                         currentTerm = creditLine.minTerm
                         currentInterestRate = creditLine.interestRate
                         currentClientId = creditLine.clientId
-                        // Realizar simulación inicial
+
                         simulateLoan(currentAmount, currentTerm)
                     },
                     onFailure = { error ->

@@ -1,4 +1,3 @@
-// app/src/main/java/com/mibanco/creditorapido.di/RepositoryModule.kt
 package com.mibanco.creditorapido.di
 
 import android.content.Context

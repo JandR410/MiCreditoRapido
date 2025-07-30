@@ -27,7 +27,6 @@ class CreditQuickFragment : Fragment() {
     private val viewModel: CreditQuickViewModel by viewModels()
     private val args: CreditQuickFragmentArgs by navArgs()
 
-    // UI Elements
     private lateinit var tvClientName: TextView
     private lateinit var tvCreditLineAmount: TextView
     private lateinit var tvInterestRate: TextView
@@ -50,11 +49,10 @@ class CreditQuickFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        initUI(view) // Inicializar elementos de UI
+        initUI(view)
         setupObservers()
         setupListeners()
 
-        // Iniciar la carga de datos del cliente usando el ID del argumento
         viewModel.fetchClientCreditLine(args.clientId)
     }
 
@@ -73,7 +71,6 @@ class CreditQuickFragment : Fragment() {
     }
 
     private fun setupObservers() {
-        // Observar la línea de crédito del cliente
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.clientCreditLine.collectLatest { resource ->
                 when (resource) {
@@ -91,15 +88,14 @@ class CreditQuickFragment : Fragment() {
                             tvInterestRate.text = "Tasa de Interés: ${String.format("%.2f", it.interestRate * 100)}%"
 
                             sbAmount.max = it.preApprovedAmount.roundToInt()
-                            sbAmount.progress = it.preApprovedAmount.roundToInt() // Iniciar con el monto máximo
+                            sbAmount.progress = it.preApprovedAmount.roundToInt()
                             tvSelectedAmount.text = "Monto: S/ ${String.format("%.2f", it.preApprovedAmount)}"
 
-                            sbTerm.max = it.maxTerm - it.minTerm // SeekBar range from 0 to (max-min)
-                            sbTerm.progress = 0 // Iniciar en el mínimo plazo
+                            sbTerm.max = it.maxTerm - it.minTerm
+                            sbTerm.progress = 0
                             tvSelectedTerm.text = "Plazo: ${it.minTerm} meses"
                             btnRequestLoan.isEnabled = true
 
-                            // Simulación inicial con los valores preaprobados
                             viewModel.simulateLoan(it.preApprovedAmount, it.minTerm)
                         }
                     }
@@ -111,20 +107,17 @@ class CreditQuickFragment : Fragment() {
                         Toast.makeText(requireContext(), resource.message, Toast.LENGTH_LONG).show()
                     }
                     is Resource.Empty -> {
-                        // Estado inicial o reseteado, no se hace nada particular en la UI
                     }
                 }
             }
         }
 
-        // Observar la simulación del préstamo
         viewModel.loanSimulation.observe(viewLifecycleOwner) { simulation ->
             tvSelectedAmount.text = "Monto: S/ ${String.format("%.2f", simulation.amount)}"
             tvSelectedTerm.text = "Plazo: ${simulation.term} meses"
             tvMonthlyPayment.text = "Cuota Mensual: S/ ${String.format("%.2f", simulation.monthlyPayment)}"
         }
 
-        // Observar el estado de la solicitud de préstamo
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.loanRequestStatus.collectLatest { resource ->
                 when (resource) {
@@ -139,26 +132,24 @@ class CreditQuickFragment : Fragment() {
                         val isSuccess = resource.data?.success ?: false
                         val loanId = resource.data?.loanId
 
-                        // Navegar a la pantalla de estado final
                         val action = CreditQuickFragmentDirections.actionCreditQuickFragmentToLoanStatusFragment(
                             isSuccess, message, loanId
                         )
                         findNavController().navigate(action)
-                        viewModel.resetLoanRequestStatus() // Resetear estado después de navegar
+                        viewModel.resetLoanRequestStatus()
                     }
                     is Resource.Error -> {
                         progressBar.visibility = View.GONE
                         btnRequestLoan.isEnabled = true
                         val errorMessage = resource.message ?: "Error desconocido al procesar la solicitud."
-                        // Navegar a la pantalla de estado final para mostrar el error
+
                         val action = CreditQuickFragmentDirections.actionCreditQuickFragmentToLoanStatusFragment(
                             false, errorMessage, null
                         )
                         findNavController().navigate(action)
-                        viewModel.resetLoanRequestStatus() // Resetear estado después de navegar
+                        viewModel.resetLoanRequestStatus()
                     }
                     is Resource.Empty -> {
-                        // Estado inicial o reseteado, no hacer nada visual
                     }
                 }
             }
@@ -170,7 +161,6 @@ class CreditQuickFragment : Fragment() {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     val amount = progress.toDouble()
-                    // Asegúrate de que el ViewModel tenga acceso al plazo actual para simular
                     val minTerm = viewModel.clientCreditLine.value.data?.minTerm ?: 1
                     val currentTerm = sbTerm.progress + minTerm
                     viewModel.simulateLoan(amount, currentTerm)

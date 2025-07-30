@@ -1,18 +1,30 @@
 package com.mibanco.creditorapido.data.repository
 
+import android.content.Context
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import  androidx.work.OneTimeWorkRequest
+import androidx.work.WorkManager
 import com.mibanco.creditorapido.data.local.dao.PendingLoanRequestDao
+import com.mibanco.creditorapido.data.local.entity.PendingLoanRequestEntity
 import com.mibanco.creditorapido.data.model.request.LoanRequest
 import com.mibanco.creditorapido.data.remote.MyBenchApi
 import com.mibanco.creditorapido.domain.model.ClientCreditLine
 import com.mibanco.creditorapido.domain.model.LoanStatus
 import com.mibanco.creditorapido.domain.repository.CreditRepository
+import com.mibanco.creditorapido.worker.LoanRetryWorker
 import com.mibanco.creditorapido.worker.NetworkMonitor
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 class CreditRepositoryImpl @Inject constructor(
     private val apiService: MyBenchApi,
     private val pendingLoanRequestDao: PendingLoanRequestDao,
-    private val networkMonitor: NetworkMonitor // Inyectamos el monitor de red
+    private val networkMonitor: NetworkMonitor,
+    @ApplicationContext private val context: Context
 ) : CreditRepository {
 
     override suspend fun getClientCreditLine(clientId: String): Result<ClientCreditLine> {
@@ -34,7 +46,7 @@ class CreditRepositoryImpl @Inject constructor(
     }
 
     override suspend fun requestLoan(loanRequest: LoanRequest): Result<LoanStatus> {
-        return if (networkMonitor.isOnline()) { // Verificar si hay conexión
+        return if (networkMonitor.isOnline()) {
             try {
                 val response = apiService.sendLoanRequest(loanRequest)
                 if (response.success) {
@@ -51,16 +63,15 @@ class CreditRepositoryImpl @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
-                // Si falla la llamada API a pesar de haber red (ej. timeout, error del servidor)
-                // Guardar localmente para reintentar más tarde
                 saveLoanRequestLocally(loanRequest)
+                enqueueLoanRetryWorker()
                 Result.failure(
                     Exception("Error de red. Solicitud guardada para reintentar.")
                 )
             }
         } else {
-            // No hay conexión, guardar la solicitud localmente
             saveLoanRequestLocally(loanRequest)
+            enqueueLoanRetryWorker()
             Result.failure(
                 Exception("No hay conexión a internet. Solicitud guardada para reintentar.")
             )
@@ -68,35 +79,49 @@ class CreditRepositoryImpl @Inject constructor(
     }
 
     private suspend fun saveLoanRequestLocally(loanRequest: LoanRequest) {
-        /*val entity = PendingLoanRequestEntity(
+        val entity = PendingLoanRequestEntity(
             amount = loanRequest.amount,
             term = loanRequest.term,
-            monthlyPayment = loanRequest.clientId,
-            interestRate = loanRequest.requestTime
+            clientId = loanRequest.clientId,
+            requestTime = loanRequest.requestTime
         )
-        pendingLoanRequestDao.insertLoanRequest(entity)*/
+        pendingLoanRequestDao.insertLoanRequest(entity)
     }
 
     override suspend fun getPendingLoanRequests(): List<LoanRequest> {
-        return pendingLoanRequestDao.getAllPendingRequests().map { entity ->
+        return pendingLoanRequestDao.getAllLoanRequests().map { entity ->
             LoanRequest(
                 amount = entity.amount,
                 term = entity.term,
-                clientId = entity.interestRate.toString(),
-                requestTime = entity.timestamp
+                clientId = entity.clientId,
+                requestTime = entity.requestTime
             )
         }
     }
 
     override suspend fun deletePendingLoanRequest(loanRequest: LoanRequest) {
-        /*  val entity = PendingLoanRequestEntity(
-              amount = loanRequest.amount,
-              term = loanRequest.term,
-              clientId = loanRequest.clientId,
-              requestTime = loanRequest.requestTime
-          )
+        pendingLoanRequestDao.deleteLoanRequestByDetails(loanRequest.clientId, loanRequest.requestTime)
+    }
 
-          pendingLoanRequestDao.deleteLoanRequestByDetails(loanRequest.clientId, loanRequest.requestTime)
-      */
+    private fun enqueueLoanRetryWorker() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val retryWorkRequest = OneTimeWorkRequest.Builder(LoanRetryWorker::class.java)
+            .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                5_000L,
+                TimeUnit.MILLISECONDS
+            )
+            .addTag("loan_retry_work")
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "loan_retry_unique_work",
+            ExistingWorkPolicy.REPLACE,
+            retryWorkRequest
+        )
     }
 }

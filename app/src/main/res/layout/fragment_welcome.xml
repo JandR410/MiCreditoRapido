@@ -11,16 +11,16 @@
     tools:context=".presentation.welcome.WelcomeFragment">
 
     <ImageView
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:src="@drawable/ic_mibanco_logo"
-        android:contentDescription="Mibanco Logo"
+        android:layout_width="250dp"
+        android:layout_height="140dp"
+        android:src="@drawable/logo"
+        android:contentDescription="@string/mibanco_logo"
         android:layout_marginBottom="32dp"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="¡Bienvenido a Mi Crédito Rápido!"
+        android:text="@string/bienvenido_a_mi_cr_dito_r_pido"
         android:textSize="24sp"
         android:textStyle="bold"
         android:textColor="@color/black"
@@ -30,7 +30,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Descubre tu línea de crédito preaprobada y simula tu préstamo al instante."
+        android:text="@string/descubre_tu_l_nea_de_cr_dito_preaprobada_y_simula_tu_pr_stamo_al_instante"
         android:textSize="16sp"
         android:textColor="@color/gray"
         android:textAlignment="center"
@@ -40,7 +40,7 @@
         android:id="@+id/btnSearchUsers"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Buscar mi Crédito"
+        android:text="@string/buscar_mi_cr_dito"
         android:paddingVertical="12dp"
         android:backgroundTint="@color/blue_500"
         android:textColor="@color/white"
